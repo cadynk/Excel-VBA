@@ -1,0 +1,279 @@
+Sub FormatData()
+' Move data to new sheet
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    Application.ScreenUpdating = False
+    
+    'Declare variables
+    Dim i As Long, j As Long, z As Long
+    Dim EndCol As String, CurCol As String
+    Dim EndRow As Long
+    Dim booIn As Boolean
+    Dim shtToday As Worksheet
+    
+    ' Create a sheet with today's date, delete existing sheet with that name
+    Set shtToday = Sheets(Format(Date, "m.d.yy"))
+    If Not (shtToday Is Nothing) Then shtToday.Delete
+    Set shtToday = Sheets.Add
+    shtToday.Name = (Format(Date, "m.d.yy"))
+    
+    'Find sys names...move data into today's report
+    With Sheets("Paste from Excel Inplace")
+        EndCol = Left(.Range("XFD1").End(xlToLeft).Address(ColumnAbsolute:=False), _
+            InStr(.Range("XFD1").End(xlToLeft).Address(ColumnAbsolute:=False), "$") - 1)
+        EndRow = .Range("B1048576").End(xlUp).Row
+        booIn = False
+        
+        For Each c In .Range("B2:B" & EndRow)
+            If c <> "" Then
+                If booIn Then
+                    'Reach end of a system, copy and paste data
+                    .Range("B" & i & ":" & EndCol & j).Copy
+                    shtToday.Cells(shtToday.Range("A1048576").End(xlUp).Row + 2, 1).PasteSpecial _
+                        Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:=False, Transpose:=True
+                    If z < j - i + 1 Then z = j - i + 1
+                Else
+                    i = c.Row
+                    j = c.Row
+                End If
+                booIn = Not booIn
+            Else
+                j = c.Row
+            End If
+        Next c
+    End With
+    
+    ' Format data for report
+    i = 0
+    With shtToday
+        .Activate
+        
+        'Split start date/time into two columns
+        .Columns("B:B").Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+        .Columns("A:A").TextToColumns Destination:=.Range("A3"), DataType:=xlDelimited, _
+            TextQualifier:=xlDoubleQuote, ConsecutiveDelimiter:=True, Tab:=True, _
+            Semicolon:=False, Comma:=False, Space:=True, Other:=False, FieldInfo _
+            :=Array(Array(1, 3), Array(2, 1)), TrailingMinusNumbers:=True
+        .Columns("A:A").NumberFormat = "ddd m/d/yy;@"
+        .Columns("A:A").Replace What:="Start", Replacement:="Start Date", LookAt:= _
+            xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
+        .Columns("B:B").NumberFormat = "hh:mm"
+        .Columns("B:B").Replace What:="Date/Time", Replacement:="Start Time", LookAt:= _
+            xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
+        
+        'Split end date/time into two columns
+        .Columns("D:D").Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+        .Columns("C:C").TextToColumns Destination:=.Range("C3"), DataType:=xlDelimited, _
+            TextQualifier:=xlDoubleQuote, ConsecutiveDelimiter:=True, Tab:=True, _
+            Semicolon:=False, Comma:=False, Space:=True, Other:=False, FieldInfo _
+            :=Array(Array(1, 3), Array(2, 1)), TrailingMinusNumbers:=True
+        .Columns("C:C").NumberFormat = "ddd m/d/yy;@"
+        .Columns("C:C").Replace What:="End", Replacement:="End Date", LookAt:= _
+            xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
+        .Columns("D:D").NumberFormat = "hh:mm"
+        .Columns("D:D").Replace What:="Date/Time", Replacement:="End Time", LookAt:= _
+            xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+            ReplaceFormat:=False
+                
+        'Fix format on "Amount" column
+        .Columns("H:H").TextToColumns Destination:=.Range("H3"), DataType:=xlDelimited, _
+            TextQualifier:=xlDoubleQuote, ConsecutiveDelimiter:=False, Tab:=True, _
+            Semicolon:=False, Comma:=False, Space:=False, Other:=False, FieldInfo _
+            :=Array(Array(1, 1), Array(2, 1)), TrailingMinusNumbers:=True
+        .Columns("H:H").NumberFormat = "#,##0"
+        
+        'Correctly format shifts, if used
+        If Range("RptUseProdShifts") Then
+            .Columns("E:E").TextToColumns Destination:=.Range("E3"), DataType:=xlDelimited, _
+                TextQualifier:=xlDoubleQuote, ConsecutiveDelimiter:=False, Tab:=True, _
+                Semicolon:=False, Comma:=False, Space:=False, Other:=False, FieldInfo _
+                :=Array(Array(1, 1), Array(2, 1)), TrailingMinusNumbers:=True
+            .Columns("E:E").NumberFormat = "0.0"
+        Else
+            i = i + 1
+            .Columns("E:E").Delete Shift:=xlToLeft
+        End If
+        
+        'Work backwards to determine if the date/time columns are used
+        If Not Range("RptUseEndTime") Then
+            i = i + 1
+            .Columns("D:D").Delete Shift:=xlToLeft
+        End If
+        If Not Range("RptUseEndDate") Then
+            i = i + 1
+            .Columns("C:C").Delete Shift:=xlToLeft
+        End If
+        If Not Range("RptUseStartTime") Then
+            i = i + 1
+            .Columns("B:B").Delete Shift:=xlToLeft
+        End If
+        
+        'Rename some column headings
+        .Cells.Replace What:="Product Desc", Replacement:="Product Description" _
+            , LookAt:=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat _
+            :=False, ReplaceFormat:=False
+        For Each c In Range("RptRenames")
+            .Cells.Replace What:=c, Replacement:=c.Offset(0, 1), _
+                LookAt:=xlPart, SearchOrder:=xlByRows, MatchCase:=False, SearchFormat _
+                :=False, ReplaceFormat:=False
+        Next c
+        
+        'Start Formating
+        With .Cells.Interior
+            .Pattern = xlNone
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+            .Color = 15853019
+        End With
+        With .Cells
+            .EntireColumn.AutoFit
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .WrapText = False
+            .ShrinkToFit = False
+            .MergeCells = False
+        End With
+        .Columns(6 - i).HorizontalAlignment = xlLeft
+        .Columns(7 - i).Cells.Interior.Pattern = xlNone
+        .Columns(8 - i).Cells.Interior.Pattern = xlNone
+        .Columns(7 - i).Cut
+        .Columns(6 - i).Insert Shift:=xlToRight
+        
+        'Determine widest system (most columns)
+        z = z + 2 - i
+        
+        'Delete empty rows
+        i = 4
+        Do Until i >= .Range("A1048576").End(xlUp).Row
+            If .Cells(i, 2) = "" And (.Cells(i + 1, 1) = "" Or IsDate(.Cells(i + 1, 1))) Then
+                .Rows(i).EntireRow.Delete
+                i = i - 1
+            Else
+                i = i + 1
+            End If
+        Loop
+        
+        'Clean up formating
+        EndCol = Left(.Cells(1, z).Address(ColumnAbsolute:=False), InStr(.Cells(1, z).Address(ColumnAbsolute:=False), "$") - 1)
+        EndRow = .Range("A1048576").End(xlUp).Row
+        
+        For Each c In .Range("A1:A" & .Range("A1048576").End(xlUp).Row)
+            If Left(c, 2) = Range("RptPlantID") Then
+                'Title Row, format appropriately
+                With .Range("A" & c.Row & ":" & EndCol & c.Row)
+                    .MergeCells = True
+                    .HorizontalAlignment = xlCenter
+                    .VerticalAlignment = xlCenter
+                    .Font.Size = 14
+                    .Interior.Color = 14136213
+                    .Borders.LineStyle = xlContinuous
+                End With
+            ElseIf c = "Start Date" Then
+                ' Header row
+                CurCol = Left(.Range("XFD" & c.Row).End(xlToLeft).Address(ColumnAbsolute:=False), _
+                    InStr(.Range("XFD" & c.Row).End(xlToLeft).Address(ColumnAbsolute:=False), "$") - 1)
+                If CurCol <> EndCol Then .Range(CurCol & c.Row & ":" & EndCol & c.Row).MergeCells = True
+                With .Range("A" & c.Row & ":" & EndCol & c.Row)
+                    .HorizontalAlignment = xlCenter
+                    .Interior.Color = 14994616
+                    .Borders.LineStyle = xlContinuous
+                End With
+            ElseIf c = "" Then
+                ' Blank row at beginning or between systems
+                .Range("A" & c.Row & ":" & EndCol & c.Row).Interior.Color = 16777215
+            Else
+                '  Or normal data row
+                CurCol = Left(.Range("XFD" & c.Row).End(xlToLeft).Address(ColumnAbsolute:=False), _
+                    InStr(.Range("XFD" & c.Row).End(xlToLeft).Address(ColumnAbsolute:=False), "$") - 1)
+                If CurCol <> EndCol Then
+                    With .Range(CurCol & c.Row & ":" & EndCol & c.Row)
+                        .MergeCells = True
+                        .Borders.LineStyle = xlContinuous
+                        .Interior.Color = 16777215
+                    End With
+                Else
+                    .Range(EndCol & c.Row).Interior.Color = 16777215
+                End If
+            End If
+        Next c
+        .Cells.EntireColumn.AutoFit
+    
+        ' Bold "DOWN" and "CLEANOUT"
+        .Range("A1").Select
+        .Cells.FormatConditions.Add Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""DOWN"""
+        .Cells.FormatConditions(.Cells.FormatConditions.Count).SetFirstPriority
+        With .Cells.FormatConditions(1).Font
+            .Bold = True
+            .Italic = False
+            .TintAndShade = 0
+        End With
+        .Cells.FormatConditions(1).StopIfTrue = False
+        .Cells.FormatConditions.Add Type:=xlExpression, Operator:=xlEqual, Formula1:="=$F1=""CLEANOUT"""
+        .Cells.FormatConditions(.Cells.FormatConditions.Count).SetFirstPriority
+        With .Cells.FormatConditions(1).Font
+            .Bold = True
+            .Italic = False
+            .TintAndShade = 0
+        End With
+        .Cells.FormatConditions(1).StopIfTrue = False
+        
+        ' Page Setup
+        With .PageSetup
+            .PrintArea = "$A$1:$" & EndCol & "$" & shtToday.Range("A1048576").End(xlUp).Row
+            .CenterHeader = Sheets("Setup").Range("RptTitle") & Chr(10) & "Updated: &D &T"
+            .LeftMargin = Application.InchesToPoints(0.5)
+            .RightMargin = Application.InchesToPoints(0.5)
+            .TopMargin = Application.InchesToPoints(0.6)
+            .BottomMargin = Application.InchesToPoints(0.5)
+            .HeaderMargin = Application.InchesToPoints(0.3)
+            .FooterMargin = Application.InchesToPoints(0.3)
+            .CenterHorizontally = True
+            .CenterVertically = False
+            .Zoom = False
+            If Range("RptOrientation") = "Portrait" Then
+                .Orientation = xlPortrait
+            Else
+                .Orientation = xlLandscape
+            End If
+            .PaperSize = xlPaperLetter
+            .FitToPagesWide = 1
+            If Range("RptOnePage") Then
+                .FitToPagesTall = 1
+            Else
+                .FitToPagesTall = False
+            End If
+        End With
+        
+        'Check that a page break doesn't fall in the middle of a system
+        ActiveWindow.View = xlPageBreakPreview
+        For Each c In .HPageBreaks
+            i = 0
+            Do Until Left(c.Location.Offset(-i, 0), 2) = Range("RptPlantID")
+                i = i + 1
+            Loop
+            Set c.Location = Range("A" & c.Location.Offset(-i, 0).Row)
+        Next c
+        ActiveWindow.View = xlNormalView
+        
+    ' END
+    End With
+
+Application.ScreenUpdating = True
+Application.DisplayAlerts = True
+End Sub
+
+Sub PublishReport()
+On Error GoTo Oops
+Sheets(Format(Date, "m.d.yy")).ExportAsFixedFormat Type:=xlTypePDF, Filename:= _
+        Range("RptPath"), Quality:=xlQualityStandard, _
+        IncludeDocProperties:=True, IgnorePrintAreas:=False, OpenAfterPublish:= _
+        False
+
+Exit Sub
+
+Oops:
+MsgBox "An error occured and the report was not published.  Please ensure a report has been run for today and that the Report Save Location on the Setup sheet is a valid path."
+End Sub

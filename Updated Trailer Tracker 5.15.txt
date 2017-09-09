@@ -1,0 +1,384 @@
+Sub RunData()
+
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    Application.ScreenUpdating = False
+
+' Create a sheet with today's date, delete existing sheet with that name
+Sheets("Inventory Display").Activate
+    Dim shtToday As Worksheet
+    Set shtToday = Sheets(Format(Date, "m.d.yy"))
+    If Not (shtToday Is Nothing) Then
+    shtToday.Delete
+    Set shtToday = Sheets.Add
+    shtToday.Name = Format(Date, "m.d.yy")
+    Else
+    Set shtToday = Sheets.Add
+    shtToday.Name = Format(Date, "m.d.yy")
+    shtToday.Move Before:=Worksheets("Receive Truck Display")
+    End If
+
+' RP Yard Management Operations Macro
+    Sheets("Yard Management Operations").Activate
+    
+' set filters
+    Cells.Select
+    Selection.AutoFilter
+    
+' insert Today' column
+    Columns("V:V").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Range("V1").Select
+    ActiveCell.Value = "Days Delinquent"
+    Range("V2").Select
+    ActiveCell.FormulaR1C1 = "=TODAY()-RC[-1]"
+    Selection.Copy
+    Range(Selection, Selection.End(xlDown)).Select
+    Selection.PasteSpecial Paste:=xlPasteFormulas
+    Selection.NumberFormat = "0.00"
+    Application.CutCopyMode = False
+
+' filter by receiving status
+    ActiveSheet.Range("$A$1:$AB$5000").AutoFilter Field:=6, Criteria1:=Array( _
+        "Checked In", "Receiving", "Suspended", "Open For Receiving"), Operator:=xlFilterValues
+
+' filter by days delinquent > 1.9
+    ActiveSheet.Range("$A$1:$AB$5000").AutoFilter Field:=22, Criteria1:=">1.9", _
+        Operator:=xlAnd
+        
+' filter out 17* locations
+    ActiveSheet.Range("$A$1:$W$251").AutoFilter Field:=4, Criteria1:="<1701", _
+        Operator:=xlOr, Criteria2:=">1736"
+
+
+' color code almost late trailers
+    Range("V2:V5000").Select
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlBetween, _
+        Formula1:="=1.9", Formula2:="=2.9"
+
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+    End With
+    
+    Selection.FormatConditions(1).StopIfTrue = False
+    
+' color code late trailers
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlGreater, _
+        Formula1:="=2.9"
+        
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 255
+        .TintAndShade = 0
+    End With
+    
+' Hide data we don't want
+
+    Range("A:A,C:C,G:Q,S:T,W:AB").Select
+    Selection.EntireColumn.Hidden = True
+    
+    
+' copy and paste into shtToday
+    Range("A1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    If Selection.Rows.Count < 5000 Then
+    Selection.Copy
+    
+    shtToday.Activate
+    Range("A3").Select
+    ActiveSheet.Paste
+    Else
+    shtToday.Activate
+    Range("A3").Select
+   End If
+    
+    Range("A1:G2").Select
+    With Selection
+    .MergeCells = True
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    End With
+
+    With Selection.Font
+    .Name = "Calibri"
+    .Size = 18
+    .Bold = True
+    End With
+
+    Selection.Value = "Yard Management Operations"
+    
+    
+    For i = 4 To 200
+        If Range("B" & i) > 1701 And Range("B" & i) < 1736 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        ElseIf Range("B" & i) >= 63000 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        ElseIf Range("B" & i) = 9009 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        ElseIf Range("B" & i) = 9027 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        ElseIf Range("B" & i) = 9028 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        ElseIf Range("B" & i) = 9069 Then
+            Range("A" & i, "G" & i).Delete
+            i = i - 1
+        End If
+        Next i
+        
+        
+    
+    
+    ActiveSheet.Range("$A$3:$G$120").AutoFilter Field:=2, Criteria1:="<=63000" _
+        , Operator:=xlAnd
+
+
+
+
+
+
+
+
+
+
+Sheets("Inventory Display").Activate
+    Range("a1").Select
+
+    Selection.AutoFilter
+    
+' insert "Days Delinquent" column
+    Columns("S:S").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Range("S1").Value = "Days Delinquent"
+    Range("S2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IF(RC[-2]<>"""",IFERROR(TODAY()-RC[-2],NA),""Unknown Received Date"")"
+    ActiveCell.Copy
+    
+    Range("S2:S6000").Select
+    Selection.PasteSpecial Paste:=xlPasteFormulas
+    Selection.NumberFormat = "0.00"
+  
+' filter by area "STRTRL-STORAGE TRAILER"
+
+ActiveSheet.Range("$A$1:$AC$6000").AutoFilter Field:=2, Criteria1:="STRTRL-STORAGE TRAILER", _
+        Operator:=xlAnd
+        
+' exclude sharkee 1701-1736 location
+
+ActiveSheet.Range("$A$1:$AC$6000").AutoFilter Field:=3, Criteria1:= _
+        ">SHKE-1736", Operator:=xlAnd
+        
+        
+' filter by days delinquent > 1.9
+    ActiveSheet.Range("$A$1:$AC$6000").AutoFilter Field:=19, Criteria1:=">1.9", _
+        Operator:=xlAnd
+        
+        
+' color code almost late trailers
+    
+    Range("S2:S6000").Select
+
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlBetween, _
+        Formula1:="=1.9", Formula2:="=2.9"
+
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+    End With
+    
+    Selection.FormatConditions(1).StopIfTrue = False
+            
+' color code late trailers
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlGreater, _
+        Formula1:="=2.9"
+        
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 255
+        .TintAndShade = 0
+    End With
+    
+Range("A:B,D:D,G:G,I:P,T:AC").Select
+Selection.EntireColumn.Hidden = True
+    
+' copy and paste results in shtToday
+    Range("A1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    If Selection.Rows.Count < 5000 Then
+    Selection.Copy
+    
+    shtToday.Activate
+    Range("I3").Select
+    ActiveSheet.Paste
+    Else
+    Sheets("shtToday").Activate
+    End If
+    
+    ActiveSheet.Range("H1:P2").Select
+
+    With Selection
+    .MergeCells = True
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    End With
+
+    With Selection.Font
+    .Name = "Calibri"
+    .Size = 18
+    .Bold = True
+    End With
+
+    Selection.Value = "Red Prairie Inventory Display Results"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+' SAP Trialer Management Operations Macro
+
+    Sheets("Trailer Management Operations").Activate
+
+' insert today column
+    Columns("AT:AT").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+        
+    Range("AT1").Value = "Days Delinquent"
+
+    Range("AT2").FormulaR1C1 = "=TODAY()-RC[-1]"
+    Range("AT2").Copy
+    Range("AT2:AT5000").Select
+    Selection.PasteSpecial Paste:=xlPasteFormulas
+    Selection.NumberFormat = "0.00"
+    
+    
+    Cells.AutoFilter
+
+' filter by carrier code = Shipping Trailer
+    ActiveSheet.Range("$A$1:$AW$5000").AutoFilter Field:=10, Criteria1:= _
+        "Shipping Trailer"
+    
+' filter by trailer type = "Currogate" & "Pallets"
+    ActiveSheet.Range("$A$1:$AW$5000").AutoFilter Field:=11, Criteria1:= _
+        "=Corrugated-SAP Order", Operator:=xlOr, Criteria2:="=Pallets"
+
+' filter by days delinquent > 1.9
+    ActiveSheet.Range("$A$1:$AW$5000").AutoFilter Field:=46, Criteria1:=">1.9", _
+        Operator:=xlAnd
+           
+' color code almost late trailers
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlBetween, _
+        Formula1:="=1.9", Formula2:="=2.9"
+
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+    End With
+    
+    Selection.FormatConditions(1).StopIfTrue = False
+                
+' color code late trailers
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlGreater, _
+        Formula1:="=2.9"
+        
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .Bold = True
+    End With
+    
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 255
+        .TintAndShade = 0
+    End With
+    
+
+' hide unwanted columns
+    Range("A:B,F:F,L:N,S:AR,AU:AX").Select
+    Selection.EntireColumn.Hidden = True
+
+' copy and paste filtered data
+    Range("C1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    
+ If Selection.Rows.Count < 5000 Then
+    Selection.Copy
+    
+    shtToday.Activate
+    Range("Q3").Select
+    ActiveSheet.Paste
+    Else
+    shtToday.Activate
+    Range("Q3").Select
+    End If
+
+Range("Q1:AD2").Select
+
+    With Selection
+    .MergeCells = True
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    End With
+
+    With Selection.Font
+    .Name = "Calibri"
+    .Size = 18
+    .Bold = True
+    End With
+
+    Selection.Value = "Trailer Management Operations Results"
+    
+    ActiveSheet.Columns.AutoFit
+    
+End Sub
+
